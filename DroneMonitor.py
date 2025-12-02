@@ -13,6 +13,7 @@ KEYBOARD = True # On utilise le keyboard comme entré PAR DEFAUT (Ne pas changer
 CONTROLLER = False # On utilise un controller comme entré OVERIDE KEYBOARD
 ACTIVATE_CONTROL = False # Pour utiliser le mode manuel ou automatique
 MANUAL_CONTROL = False # Pour choisir comment on commande les moteurs
+MY_PILOT = False # Pour utiliser son propre pilote
 
 DRONE_URI = "udp://192.168.43.42"
 CONTROLLER_VID = 0x3285
@@ -136,6 +137,11 @@ def send_auto_drone_commands(cf):
         time.sleep(0.01)
 
 def do_nothing(cf):
+    while running:
+        cf.commander.send_setpoint(0, 0, 0, 0)
+        time.sleep(0.01)
+
+def my_pilote(cf):
     while running:
         cf.commander.send_setpoint(0, 0, 0, 0)
         time.sleep(0.01)
@@ -280,7 +286,11 @@ def main():
             controller_thread.start()
 
         if ACTIVATE_CONTROL:
-            if MANUAL_CONTROL:
+            if MY_PILOT:
+                command_thread = threading.Thread(target=my_pilote, args=(cf,))
+                command_thread.daemon = True
+                command_thread.start()
+            elif MANUAL_CONTROL:
                 command_thread = threading.Thread(target=send_manual_drone_commands, args=(cf,))
                 command_thread.daemon = True
                 command_thread.start()
