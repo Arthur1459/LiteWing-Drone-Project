@@ -11,8 +11,8 @@ from math import sin
 # --- Configuration ---
 KEYBOARD = True # On utilise le keyboard comme entré PAR DEFAUT (Ne pas changer)
 CONTROLLER = False # On utilise un controller comme entré OVERRIDE KEYBOARD
-ACTIVATE_CONTROL = False # Pour utiliser le mode manuel ou automatique
-MANUAL_CONTROL = False # Pour choisir comment on commande les moteurs
+ACTIVATE_CONTROL = True # Pour utiliser le mode manuel ou automatique
+MANUAL_CONTROL = True # Pour choisir comment on commande les moteurs
 MY_PILOT = False # Pour utiliser son propre pilote
 
 # NETWORK LiteWing_1020ABE203.. / PSWD : 12345678
