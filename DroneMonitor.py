@@ -10,11 +10,12 @@ from math import sin
 
 # --- Configuration ---
 KEYBOARD = True # On utilise le keyboard comme entré PAR DEFAUT (Ne pas changer)
-CONTROLLER = False # On utilise un controller comme entré OVERIDE KEYBOARD
+CONTROLLER = False # On utilise un controller comme entré OVERRIDE KEYBOARD
 ACTIVATE_CONTROL = False # Pour utiliser le mode manuel ou automatique
 MANUAL_CONTROL = False # Pour choisir comment on commande les moteurs
 MY_PILOT = False # Pour utiliser son propre pilote
 
+# NETWORK LiteWing_1020ABE203.. / PSWD : 12345678
 DRONE_URI = "udp://192.168.43.42"
 CONTROLLER_VID = 0x3285
 CONTROLLER_PID = 0xc03
@@ -121,8 +122,9 @@ def send_auto_drone_commands(cf):
     global pitch_cmd, roll_cmd, yaw_cmd, thrust_cmd, running
 
     def update_cmd():
-        global thrust_cmd
-        thrust_cmd = 20_000 + 10_000 * sin(2*3.14*0.25*time.time())
+        global thrust_cmd, roll_cmd
+        thrust_cmd = 20_000
+        roll_cmd =  30 * sin(2 * 3.14 * 0.25 * time.time())
 
     cf.commander.send_setpoint(0, 0, 0, 0)
     time.sleep(0.1)
@@ -142,8 +144,18 @@ def do_nothing(cf):
         time.sleep(0.01)
 
 def my_pilote(cf):
+    global roll, pitch
+    cf.commander.send_setpoint(0, 0, 0, 0)
+    thrust = 0
     while running:
-        cf.commander.send_setpoint(0, 0, 0, 0)
+
+        print(roll, pitch)
+        if abs(roll) > 20 or abs(pitch) > 20:
+            thrust = 0
+        else:
+            thrust = 30000
+
+        cf.commander.send_setpoint(0, 0, 0, thrust)
         time.sleep(0.01)
 
 # --- Keyboard input --- #
