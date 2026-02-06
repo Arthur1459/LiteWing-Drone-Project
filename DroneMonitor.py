@@ -226,7 +226,7 @@ def draw_interface():
     screen.blit(controller_title, (RIGHT_COLUMN + 10, 50))
 
     # Sous-titre Joystick
-    joystick_title = font.render(f"Joystick: {"ON" if CONTROLLER else "OFF"}", True, (200, 200, 200))
+    joystick_title = font.render(f"Joystick: {'ON' if CONTROLLER else 'OFF'}", True, (200, 200, 200))
     screen.blit(joystick_title, (RIGHT_COLUMN + 20, 80))
     thrust_text = font.render(f"  Thrust (Right Y): {joystick_a1:.2f}", True, (255, 255, 255))
     screen.blit(thrust_text, (RIGHT_COLUMN + 40, 110))
