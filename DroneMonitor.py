@@ -26,9 +26,11 @@ battery_voltage = 0.0
 pitch, roll, yaw = 0, 0, 0
 pitch_cmd, roll_cmd, yaw_cmd, thrust_cmd = 0, 0, 0, 0
 position_z = 0.0
+joystick_a0 = 0.0 # Right Left/Right (Yaw)
 joystick_a1 = 0.0  # Right Up/Down (thrust)
 joystick_a2 = 0.0  # Left Left/Right (roll)
 joystick_a3 = 0.0  # Left Up/Down (pitch)
+code_pilote = lambda : None
 
 # --- Initialisation Pygame ---
 key_inputs = {"UP": 0., "DOWN": 0., "RIGHT": 0., "LEFT": 0., "SPACE": 0., "Z": 0., "S": 0.}
@@ -38,61 +40,8 @@ pygame.display.set_caption("Drone Monitor")
 font = pygame.font.SysFont("Arial", 18)
 clock = pygame.time.Clock()
 
-# --- Fonctions pour le drone ---
-def log_data_callback(timestamp, data, logconf):
-    """Callback pour les données du drone (copié de battery_voltage_read.py et position-tracking-graph.py)."""
-    global battery_voltage, pitch, roll, yaw, position_z
-    if 'pm.vbat' in data: battery_voltage = data['pm.vbat']
-    if 'stateEstimate.pitch' in data: pitch = data['stateEstimate.pitch']
-    if 'stateEstimate.roll' in data: roll = data['stateEstimate.roll']
-    if 'stateEstimate.yaw' in data: yaw = data['stateEstimate.yaw']
-    if 'stateEstimate.z' in data: position_z = data['stateEstimate.z']
-
-def setup_drone_logging(cf):
-    """Configure le logging pour le drone (copié de battery_voltage_read.py)."""
-    log_conf = LogConfig(name='DroneData', period_in_ms=100)
-    log_conf.add_variable('pm.vbat', 'float')
-    log_conf.add_variable('stateEstimate.pitch', 'float')
-    log_conf.add_variable('stateEstimate.roll', 'float')
-    log_conf.add_variable('stateEstimate.yaw', 'float')
-    log_conf.add_variable('stateEstimate.z', 'float')
-    cf.log.add_config(log_conf)
-    log_conf.data_received_cb.add_callback(log_data_callback)
-    log_conf.start()
-
-# --- Fonctions pour le contrôleur (copié exactement de height-hold-joystick.py) ---
-def read_controller():
-    """Lit les données du contrôleur (copié exactement de height-hold-joystick.py)."""
-    global joystick_a1, joystick_a2, joystick_a3, running
-
-    try:
-        device = hid.device()
-        device.open(CONTROLLER_VID, CONTROLLER_PID)
-        print(f"Contrôleur connecté: {device.get_product_string()}")
-
-        axis_right_updown = 6
-        axis_left_leftright = 3
-        axis_left_updown = 4
-
-        while running:
-            data = device.read(64)
-            if data:
-                # Conversion EXACTE depuis height-hold-joystick.py
-                joystick_a1 = round(((255 - data[axis_right_updown]) - 128) / 128, 2)  # Right Up/Down
-                joystick_a2 = round((data[axis_left_leftright] - 128) / 128, 2)         # Left Left/Right
-                joystick_a3 = round((data[axis_left_updown] - 128) / 128, 2)           # Left Up/Down
-            else:
-                print("Error: no data received from controller")
-            time.sleep(0.01)
-
-    except Exception as e:
-        print(f"Erreur avec le contrôleur: {e}")
-    finally:
-        if 'device' in locals():
-            device.close()
-
 def send_manual_drone_commands(cf):
-    """Envoie les commandes au drone (copié exactement de height-hold-joystick.py)."""
+    """Envoie les commandes au drone"""
     global joystick_a1, joystick_a2, joystick_a3, running, key_inputs, CONTROLLER, KEYBOARD
     global pitch_cmd, roll_cmd, yaw_cmd, thrust_cmd
 
@@ -103,11 +52,11 @@ def send_manual_drone_commands(cf):
             cmd_roll_input = 1 if key_inputs["RIGHT"] else (-1 if key_inputs["LEFT"] else 0)
             cmd_pitch_input = 1 if key_inputs["UP"] else (-1 if key_inputs["DOWN"] else 0)
         if CONTROLLER:
-            cmd_thrust_input = joystick_a1
+            cmd_thrust_input = (1 + joystick_a1) / 2 # 0 -> 1
             cmd_roll_input = joystick_a2
             cmd_pitch_input = -joystick_a3
 
-        min_thrust = 15_000 - max(0.01, -cmd_thrust_input) * 15_000
+        min_thrust = 15_000 - max(0., -cmd_thrust_input) * 15_000
         max_thrust = 50_000
         thrust = max(0., cmd_thrust_input) * (max_thrust - min_thrust) + min_thrust
         roll = 15 * cmd_roll_input
@@ -118,13 +67,13 @@ def send_manual_drone_commands(cf):
         time.sleep(0.01)
 
 def send_auto_drone_commands(cf):
-    """Envoie les commandes au drone (copié exactement de height-hold-joystick.py)."""
+    """Envoie les commandes au drone"""
     global pitch_cmd, roll_cmd, yaw_cmd, thrust_cmd, running
 
     def update_cmd():
         global thrust_cmd, roll_cmd
         thrust_cmd = 20_000
-        roll_cmd =  30 * sin(2 * 3.14 * 0.25 * time.time())
+        roll_cmd = 30 * sin(2 * 3.14 * 0.25 * time.time())
 
     cf.commander.send_setpoint(0, 0, 0, 0)
     time.sleep(0.1)
@@ -143,7 +92,7 @@ def do_nothing(cf):
         cf.commander.send_setpoint(0, 0, 0, 0)
         time.sleep(0.01)
 
-def my_pilote(cf):
+def my_pilote_pitch_stop(cf):
     global roll, pitch
     cf.commander.send_setpoint(0, 0, 0, 0)
     thrust = 0
@@ -158,6 +107,93 @@ def my_pilote(cf):
         cf.commander.send_setpoint(0, 0, 0, thrust)
         time.sleep(0.01)
 
+def my_pilote(cf):
+    global roll, pitch, yaw, yaw_cmd, thrust_cmd
+
+    cf.commander.send_setpoint(0, 0, 0, 0)
+
+    print("Press SPACE to start.")
+    BlockUntilKeyPressed("SPACE")
+    print("Started.")
+
+    t_init = time.time()
+    yaw_init = yaw
+    while running:
+
+        dt = time.time() - t_init
+        thrust_cmd = 20_000
+        yaw_cmd = (yaw_init + 5 * dt) % 360 # x ° / s
+
+        cf.commander.send_setpoint(0, 0, yaw_cmd, thrust_cmd)
+        time.sleep(0.01)
+
+code_pilote = my_pilote
+
+def StartProcedure(cf):
+    global roll_cmd, pitch_cmd, yaw_cmd, thrust_cmd
+    roll_cmd, pitch_cmd, yaw_cmd, thrust_cmd = 0, 0, 0, 0
+    cf.commander.send_setpoint(0, 0, 0, 0)  # Roll, Pitch, Yaw, Thrust
+    print("Press SPACE to start.")
+    BlockUntilKeyPressed("SPACE")
+    print("Started.")
+    cf.commander.send_setpoint(0, 0, 0, 0)  # Roll, Pitch, Yaw, Thrust
+    return
+
+# --- Fonctions pour le drone ---
+def log_data_callback(timestamp, data, logconf):
+    """Callback pour les données du drone"""
+    global battery_voltage, pitch, roll, yaw, position_z
+    if 'pm.vbat' in data: battery_voltage = data['pm.vbat']
+    if 'stateEstimate.pitch' in data: pitch = data['stateEstimate.pitch']
+    if 'stateEstimate.roll' in data: roll = data['stateEstimate.roll']
+    if 'stateEstimate.yaw' in data: yaw = data['stateEstimate.yaw']
+    if 'stateEstimate.z' in data: position_z = data['stateEstimate.z']
+
+def setup_drone_logging(cf):
+    """Configure le logging pour le drone"""
+    log_conf = LogConfig(name='DroneData', period_in_ms=100)
+    log_conf.add_variable('pm.vbat', 'float')
+    log_conf.add_variable('stateEstimate.pitch', 'float')
+    log_conf.add_variable('stateEstimate.roll', 'float')
+    log_conf.add_variable('stateEstimate.yaw', 'float')
+    log_conf.add_variable('stateEstimate.z', 'float')
+    cf.log.add_config(log_conf)
+    log_conf.data_received_cb.add_callback(log_data_callback)
+    log_conf.start()
+
+# --- Fonctions pour le contrôleur (copié exactement de height-hold-joystick.py) ---
+def read_controller():
+    """Lit les données du contrôleur"""
+    global joystick_a0, joystick_a1, joystick_a2, joystick_a3, running
+
+    try:
+        device = hid.device()
+        device.open(CONTROLLER_VID, CONTROLLER_PID)
+        print(f"Contrôleur connecté: {device.get_product_string()}")
+
+        axis_right_leftright = 4
+        axis_right_updown = 6
+        axis_left_leftright = 3
+        axis_left_updown = 4
+
+        while running:
+            data = device.read(64)
+            if data:
+                # Conversion EXACTE depuis height-hold-joystick.py
+                joystick_a0 = round((data[axis_right_leftright] - 128) / 128, 2)       # Right Left/Right
+                joystick_a1 = round(((data[axis_right_updown]) - 128) / 128, 2)        # Right Up/Down
+                joystick_a2 = round((data[axis_left_leftright] - 128) / 128, 2)        # Left Left/Right
+                joystick_a3 = round((data[axis_left_updown] - 128) / 128, 2)           # Left Up/Down
+            else:
+                print("Error: no data received from controller")
+            time.sleep(0.01)
+
+    except Exception as e:
+        print(f"Erreur avec le contrôleur: {e}")
+    finally:
+        if 'device' in locals():
+            device.close()
+
 # --- Keyboard input --- #
 def getkeyInputs():
     global key_inputs
@@ -169,6 +205,11 @@ def getkeyInputs():
     key_inputs["LEFT"] = True if keys[pygame.K_LEFT] else False
     key_inputs["Z"] = True if keys[pygame.K_z] else False
     key_inputs["S"] = True if keys[pygame.K_s] else False
+
+def BlockUntilKeyPressed(key: str):
+    global key_inputs
+    while not key_inputs[key]: continue
+    return True
 
 # --- Fonction pour dessiner l'interface ---
 def draw_interface():
@@ -281,15 +322,19 @@ def draw_interface():
 
 # --- Fonction principale ---
 def main():
-    global running
+    global running, code_pilote
     print("Drone Monitor")
 
     # Initialisation du drone
+    print("Init drone driver...")
     cflib.crtp.init_drivers()
 
+    print("Connection to drone...")
     with SyncCrazyflie(DRONE_URI) as scf:
         cf = scf.cf
+        print("Setup data exchange...")
         setup_drone_logging(cf)
+        print("Done and ready.")
 
         # Démarrage des threads
         if CONTROLLER:
@@ -299,7 +344,7 @@ def main():
 
         if ACTIVATE_CONTROL:
             if MY_PILOT:
-                command_thread = threading.Thread(target=my_pilote, args=(cf,))
+                command_thread = threading.Thread(target=code_pilote, args=(cf,))
                 command_thread.daemon = True
                 command_thread.start()
             elif MANUAL_CONTROL:
@@ -327,7 +372,8 @@ def main():
             clock.tick(60)
 
     cf.commander.send_setpoint(0, 0, 0, 0)
+    cf.commander.send_stop_setpoint()
     pygame.quit()
     sys.exit()
 
-main()
+#main()
