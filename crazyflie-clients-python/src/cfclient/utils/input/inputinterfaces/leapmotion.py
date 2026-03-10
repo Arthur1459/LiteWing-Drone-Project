@@ -84,9 +84,9 @@ class LeapListener(Leap.Listener):
             # Pich and roll are mixed up...
 
             if len(hand.fingers) >= 4:
-                data["roll"] = -direction.pitch * Leap.RAD_TO_DEG / 30.0
-                data["pitch"] = -normal.roll * Leap.RAD_TO_DEG / 30.0
-                data["yaw"] = direction.yaw * Leap.RAD_TO_DEG / 70.0
+                data["roll"] = -direction.pitch_measured * Leap.RAD_TO_DEG / 30.0
+                data["pitch"] = -normal.roll_measured * Leap.RAD_TO_DEG / 30.0
+                data["yaw"] = direction.yaw_measured * Leap.RAD_TO_DEG / 70.0
                 # Use the elevation of the hand for thrust
                 data["thrust"] = (hand.palm_position[1] - 80) / 150.0
 

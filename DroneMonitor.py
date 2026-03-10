@@ -23,7 +23,7 @@ CONTROLLER_PID = 0xc03
 # --- Variables globales ---
 running = True
 battery_voltage = 0.0
-pitch, roll, yaw = 0, 0, 0
+pitch_measured, roll_measured, yaw_measured = 0, 0, 0
 pitch_cmd, roll_cmd, yaw_cmd, thrust_cmd = 0, 0, 0, 0
 position_z = 0.0
 joystick_a0 = 0.0 # Right Left/Right (Yaw)
@@ -93,13 +93,13 @@ def do_nothing(cf):
         time.sleep(0.01)
 
 def my_pilote_pitch_stop(cf):
-    global roll, pitch
+    global roll_measured, pitch_measured
     cf.commander.send_setpoint(0, 0, 0, 0)
     thrust = 0
     while running:
 
-        print(roll, pitch)
-        if abs(roll) > 20 or abs(pitch) > 20:
+        print(roll_measured, pitch_measured)
+        if abs(roll_measured) > 20 or abs(pitch_measured) > 20:
             thrust = 0
         else:
             thrust = 30000
@@ -108,7 +108,7 @@ def my_pilote_pitch_stop(cf):
         time.sleep(0.01)
 
 def my_pilote(cf):
-    global roll, pitch, yaw, yaw_cmd, thrust_cmd
+    global roll_measured, pitch_measured, yaw_measured, yaw_cmd, thrust_cmd
 
     cf.commander.send_setpoint(0, 0, 0, 0)
 
@@ -117,7 +117,7 @@ def my_pilote(cf):
     print("Started.")
 
     t_init = time.time()
-    yaw_init = yaw
+    yaw_init = yaw_measured
     while running:
 
         dt = time.time() - t_init
@@ -134,7 +134,9 @@ def StartProcedure(cf):
     roll_cmd, pitch_cmd, yaw_cmd, thrust_cmd = 0, 0, 0, 0
     cf.commander.send_setpoint(0, 0, 0, 0)  # Roll, Pitch, Yaw, Thrust
     print("Press SPACE to start.")
-    BlockUntilKeyPressed("SPACE")
+    while not KeyPressed("SPACE"):
+        cf.commander.send_setpoint(0, 0, 0, 0)  # Roll, Pitch, Yaw, Thrust # Keep connection on
+        time.sleep(0.05)
     print("Started.")
     cf.commander.send_setpoint(0, 0, 0, 0)  # Roll, Pitch, Yaw, Thrust
     return
@@ -142,11 +144,11 @@ def StartProcedure(cf):
 # --- Fonctions pour le drone ---
 def log_data_callback(timestamp, data, logconf):
     """Callback pour les données du drone"""
-    global battery_voltage, pitch, roll, yaw, position_z
+    global battery_voltage, pitch_measured, roll_measured, yaw_measured, position_z
     if 'pm.vbat' in data: battery_voltage = data['pm.vbat']
-    if 'stateEstimate.pitch' in data: pitch = data['stateEstimate.pitch']
-    if 'stateEstimate.roll' in data: roll = data['stateEstimate.roll']
-    if 'stateEstimate.yaw' in data: yaw = data['stateEstimate.yaw']
+    if 'stateEstimate.pitch' in data: pitch_measured = -1 * data['stateEstimate.pitch']
+    if 'stateEstimate.roll' in data: roll_measured = data['stateEstimate.roll']
+    if 'stateEstimate.yaw' in data: yaw_measured = data['stateEstimate.yaw']
     if 'stateEstimate.z' in data: position_z = data['stateEstimate.z']
 
 def setup_drone_logging(cf):
@@ -171,7 +173,7 @@ def read_controller():
         device.open(CONTROLLER_VID, CONTROLLER_PID)
         print(f"Contrôleur connecté: {device.get_product_string()}")
 
-        axis_right_leftright = 4
+        axis_right_leftright = 5
         axis_right_updown = 6
         axis_left_leftright = 3
         axis_left_updown = 4
@@ -181,9 +183,9 @@ def read_controller():
             if data:
                 # Conversion EXACTE depuis height-hold-joystick.py
                 joystick_a0 = round((data[axis_right_leftright] - 128) / 128, 2)       # Right Left/Right
-                joystick_a1 = round(((data[axis_right_updown]) - 128) / 128, 2)        # Right Up/Down
+                joystick_a1 = round(((128 - data[axis_right_updown])) / 128, 2)        # Right Up/Down
                 joystick_a2 = round((data[axis_left_leftright] - 128) / 128, 2)        # Left Left/Right
-                joystick_a3 = round((data[axis_left_updown] - 128) / 128, 2)           # Left Up/Down
+                joystick_a3 = round((128 - data[axis_left_updown]) / 128, 2)           # Left Up/Down
             else:
                 print("Error: no data received from controller")
             time.sleep(0.01)
@@ -205,15 +207,22 @@ def getkeyInputs():
     key_inputs["LEFT"] = True if keys[pygame.K_LEFT] else False
     key_inputs["Z"] = True if keys[pygame.K_z] else False
     key_inputs["S"] = True if keys[pygame.K_s] else False
+    key_inputs["Q"] = True if keys[pygame.K_q] else False
+    key_inputs["D"] = True if keys[pygame.K_d] else False
 
 def BlockUntilKeyPressed(key: str):
     global key_inputs
     while not key_inputs[key]: continue
     return True
+def KeyPressed(key: str):
+    if key in key_inputs: return key_inputs[key]
+    else:
+        print(f"Key not registered ! '{key}'")
+        return False
 
 # --- Fonction pour dessiner l'interface ---
 def draw_interface():
-    global battery_voltage, pitch, roll, yaw, position_z, screen, joystick_a1, joystick_a2, joystick_a3
+    global battery_voltage, pitch_measured, roll_measured, yaw_measured, position_z, screen, joystick_a1, joystick_a2, joystick_a3
     global pitch_cmd, roll_cmd, yaw_cmd, thrust_cmd, key_inputs
 
     # --- Variables de dimensionnement (modifiables) ---
@@ -250,11 +259,11 @@ def draw_interface():
     # Orientation
     orientation_title = font.render("Orientation (°):", True, (200, 200, 200))
     screen.blit(orientation_title, (LEFT_COLUMN + 10, 110))
-    pitch_text = font.render(f"  Pitch: {pitch:.1f}°", True, (255, 255, 255))
+    pitch_text = font.render(f"  Pitch: {pitch_measured:.1f}°", True, (255, 255, 255))
     screen.blit(pitch_text, (LEFT_COLUMN + 30, 140))
-    roll_text = font.render(f"  Roll: {roll:.1f}°", True, (255, 255, 255))
+    roll_text = font.render(f"  Roll: {roll_measured:.1f}°", True, (255, 255, 255))
     screen.blit(roll_text, (LEFT_COLUMN + 30, 170))
-    yaw_text = font.render(f"  Yaw: {yaw:.1f}°", True, (255, 255, 255))
+    yaw_text = font.render(f"  Yaw: {yaw_measured:.1f}°", True, (255, 255, 255))
     screen.blit(yaw_text, (LEFT_COLUMN + 30, 200))
 
     # Altitude

@@ -139,18 +139,18 @@ class InputDevice(InputReaderInterface):
                 pass
             i += 1
 
-        self.data.roll = InputDevice.deadband(self.data.roll, self.db)
-        self.data.pitch = InputDevice.deadband(self.data.pitch, self.db)
+        self.data.roll_measured = InputDevice.deadband(self.data.roll_measured, self.db)
+        self.data.pitch_measured = InputDevice.deadband(self.data.pitch_measured, self.db)
 
         if self.limit_rp:
-            [self.data.roll, self.data.pitch] = self._scale_rp(self.data.roll,
-                                                               self.data.pitch)
+            [self.data.roll_measured, self.data.pitch_measured] = self._scale_rp(self.data.roll_measured,
+                                                                                 self.data.pitch_measured)
         if self.limit_thrust:
             self.data.thrust = self._limit_thrust(self.data.thrust,
                                                   self.data.assistedControl,
                                                   self.data.estop)
         if self.limit_yaw:
-            self.data.yaw = self._scale_and_deadband_yaw(self.data.yaw)
+            self.data.yaw_measured = self._scale_and_deadband_yaw(self.data.yaw_measured)
 
         if include_raw:
             return [axis, buttons, self.data]

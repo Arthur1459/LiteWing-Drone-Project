@@ -1,0 +1,23 @@
+cflib @ git+https://github.com/Circuit-Digest/crazyflie-lib-python.git
+setuptools
+appdirs~=1.4.0
+pyzmq~=26.0
+pyqtgraph~=0.13
+PyYAML~=6.0.1
+numpy~=1.20
+vispy~=0.14.3
+pyopengl~=3.1.7
+pyserial~=3.5
+PyQt6~=6.7
+PyQt6-sip~=13.8
+
+[:platform_system == "Windows" or platform_system == "Darwin"]
+pysdl2~=0.9.14
+pysdl2-dll==2.24.0
+
+[dev]
+pre-commit
+
+[dev:platform_system == "Windows"]
+cx_freeze==5.1.1
+jinja2==2.10.3

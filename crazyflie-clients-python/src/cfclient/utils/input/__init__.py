@@ -450,18 +450,18 @@ class JoystickReader(object):
                 if self._assisted_control == \
                         JoystickReader.ASSISTED_CONTROL_POSHOLD \
                         and data.assistedControl:
-                    vx = data.roll
-                    vy = data.pitch
+                    vx = data.roll_measured
+                    vy = data.pitch_measured
                     vz = data.thrust
-                    yawrate = data.yaw
+                    yawrate = data.yaw_measured
                     # The odd use of vx and vy is to map forward on the
                     # physical joystick to positive X-axis
                     self.assisted_input_updated.call(vy, -vx, vz, yawrate)
                 elif self._assisted_control == \
                         JoystickReader.ASSISTED_CONTROL_HOVER \
                         and data.assistedControl:
-                    vx = data.roll
-                    vy = data.pitch
+                    vx = data.roll_measured
+                    vy = data.pitch_measured
 
                     # Scale thrust to a value between -1.0 to 1.0
                     vz = (data.thrust - 32767) / 32767.0
@@ -473,7 +473,7 @@ class JoystickReader(object):
                     if self._target_height < MIN_HOVER_HEIGHT:
                         self._target_height = MIN_HOVER_HEIGHT
 
-                    yawrate = data.yaw
+                    yawrate = data.yaw_measured
                     # The odd use of vx and vy is to map forward on the
                     # physical joystick to positive X-axis
                     self.hover_input_updated.call(vy, -vx, yawrate,
@@ -497,9 +497,9 @@ class JoystickReader(object):
                     if self._assisted_control == \
                             JoystickReader.ASSISTED_CONTROL_HEIGHTHOLD \
                             and data.assistedControl:
-                        roll = data.roll + self.trim_roll
-                        pitch = data.pitch + self.trim_pitch
-                        yawrate = data.yaw
+                        roll = data.roll_measured + self.trim_roll
+                        pitch = data.pitch_measured + self.trim_pitch
+                        yawrate = data.yaw_measured
                         # Scale thrust to a value between -1.0 to 1.0
                         vz = (data.thrust - 32767) / 32767.0
                         # Integrate velocity setpoint
@@ -524,9 +524,9 @@ class JoystickReader(object):
                         if data.thrust > 0xFFFF:
                             data.thrust = 0xFFFF
 
-                        self.input_updated.call(data.roll + self.trim_roll,
-                                                data.pitch + self.trim_pitch,
-                                                data.yaw, data.thrust)
+                        self.input_updated.call(data.roll_measured + self.trim_roll,
+                                                data.pitch_measured + self.trim_pitch,
+                                                data.yaw_measured, data.thrust)
             else:
                 self.input_updated.call(0, 0, 0, 0)
         except Exception:

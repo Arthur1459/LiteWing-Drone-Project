@@ -18,13 +18,13 @@ with SyncCrazyflie(DRONE_URI) as scf:
     time.sleep(0.1)
 
     # Flight parameters
-    roll = 0.0
-    pitch = 0.0
-    yaw = 0
+    roll_measured = 0.0
+    pitch_measured = 0.0
+    yaw_measured = 0
     thrust = 20_000  # Thrust value is 10_000 minimum and 60_000 maximum
     # Start motors
     print("Starting motors at minimum speed...")
-    connection.commander.send_setpoint(roll, pitch, yaw, thrust)
+    connection.commander.send_setpoint(roll_measured, pitch_measured, 0, thrust)
     #print(connection.log.log_blocks)
     time.sleep(1)
 
